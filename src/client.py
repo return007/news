@@ -6,9 +6,12 @@ on various endpoints and various parameters supported by https://newsapi.org/.
 :date: 20190702
 """
 
+import logging
 import requests
 
 ALL = 'ALL'
+
+logger = logging.getLogger("client.NewsReader")
 
 class NewsReader:
 
@@ -68,7 +71,6 @@ class NewsReader:
 
         :param query_string:
             `GET` parameters to be appended to the query.
-        
         """
         if not prefix.endswith("/"):
             prefix += "/"
@@ -83,13 +85,35 @@ class NewsReader:
             all_parts += query_string
         return prefix + all_parts
 
+    def _add_apikey_param(self, query_string=None):
+        """
+        Adds APIKEY to the `query_string` param.
+        """
+        if query_string is None:
+            return "apikey={}".format(self.apikey)
+        return query_string + "&apikey={}".format(self.apikey)
+
     def _request(self, endpoint, **kwargs):
         """
         Central utility to send request to `endpoint` with `GET` parameters
         from `kwargs` passed.
+
+        :return: ``json`` response from the request sent to the `endpoint`
         """
         params     = list(kwargs.items())
         params     = map(lambda x: "{}={}".format(x[0], x[1]), params)
         get_params = "&".join(params)
-        u = self._url_join(self.url, endpoint, query_string=get_params)
-        return u
+        get_params = self._add_apikey_param(get_params)
+        url = self._url_join(self.url, endpoint, query_string=get_params)
+
+        # Send a GET request to the url
+        req = requests.get(url)
+        resp = req.json()
+        if req.status_code == 200:
+            logger.info("[INFO] Request to '{}' was successful!".format(url))
+            return resp
+        logger.error("[ERROR] Status code: {}".format(rep.status_code))
+        logger.error(
+            "[ERROR] '{}': '{}'".format(resp['code'], resp['message'])
+        )
+        sys.exit(1)
