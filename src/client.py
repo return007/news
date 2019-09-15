@@ -8,6 +8,7 @@ on various endpoints and various parameters supported by https://newsapi.org/.
 
 import logging
 import requests
+import sys
 
 ALL = 'ALL'
 
@@ -85,11 +86,11 @@ class NewsReader:
             all_parts += query_string
         return prefix + all_parts
 
-    def _add_apikey_param(self, query_string=None):
+    def _add_apikey_param(self, query_string=''):
         """
         Adds APIKEY to the `query_string` param.
         """
-        if query_string is None:
+        if query_string is '':
             return "apikey={}".format(self.apikey)
         return query_string + "&apikey={}".format(self.apikey)
 
@@ -112,7 +113,7 @@ class NewsReader:
         if req.status_code == 200:
             logger.info("[INFO] Request to '{}' was successful!".format(url))
             return resp
-        logger.error("[ERROR] Status code: {}".format(rep.status_code))
+        logger.error("[ERROR] Status code: {}".format(req.status_code))
         logger.error(
             "[ERROR] '{}': '{}'".format(resp['code'], resp['message'])
         )
