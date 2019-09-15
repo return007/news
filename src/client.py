@@ -10,29 +10,29 @@ import logging
 import requests
 import sys
 
-ALL = 'ALL'
-
 logger = logging.getLogger("client.NewsReader")
 
+ALL = 'ALL'
+
+ALLOWED_COUNTRY = {
+    'ae', 'ar', 'at', 'au', 'be', 'bg', 'br', 'ca', 'ch', 'cn', 'co', 'cu',
+    'cz', 'de', 'eg', 'fr', 'gb', 'gr', 'hk', 'hu', 'id', 'ie', 'il', 'in',
+    'it', 'jp', 'kr', 'lt', 'lv', 'ma', 'mx', 'my', 'ng', 'nl', 'no', 'nz',
+    'ph', 'pl', 'pt', 'ro', 'rs', 'ru', 'sa', 'se', 'sg', 'si', 'sk', 'th',
+    'tr', 'tw', 'ua', 'us', 've', 'za'
+}
+
+ALLOWED_CATEGORY = {
+    'business', 'entertainment', 'general', 'healt','science', 'sports'
+    'technology'
+}
+
+ALLOWED_LANGUAGE = {
+    'ar', 'de', 'en', 'es', 'fr', 'he', 'it', 'nl', 'no', 'pt', 'ru', 'se',
+    'ud', 'zh'
+}
+
 class NewsReader:
-
-    ALLOWED_COUNTRY = {
-        'ae', 'ar', 'at', 'au', 'be', 'bg', 'br', 'ca', 'ch', 'cn', 'co', 'cu',
-        'cz', 'de', 'eg', 'fr', 'gb', 'gr', 'hk', 'hu', 'id', 'ie', 'il', 'in',
-        'it', 'jp', 'kr', 'lt', 'lv', 'ma', 'mx', 'my', 'ng', 'nl', 'no', 'nz',
-        'ph', 'pl', 'pt', 'ro', 'rs', 'ru', 'sa', 'se', 'sg', 'si', 'sk', 'th',
-        'tr', 'tw', 'ua', 'us', 've', 'za'
-    }
-
-    ALLOWED_CATEGORY = {
-        'business', 'entertainment', 'general', 'healt','science', 'sports'
-        'technology'
-    }
-
-    ALLOWED_LANGUAGE = {
-        'ar', 'de', 'en', 'es', 'fr', 'he', 'it', 'nl', 'no', 'pt', 'ru', 'se',
-        'ud', 'zh'
-    }
 
     def __init__(self, apikey):
         """
@@ -51,8 +51,67 @@ class NewsReader:
             "Category should be one of '{}'".format(ALLOWED_CATEGORY)
         pass
 
-    def get_sources(self, category=ALL, language=ALL, country=ALL):
-        pass
+    def _get_sources(self, category=ALL, language=ALL, country=ALL):
+        """
+        Returns information about sources (supported by https://newsapi.org).
+
+        :param category: category of news, can be one of `ALLOWED_CATEGORY`.
+        :type category: ``str``
+
+        :param language: language of news, can be one of `ALLOWED_LANGUAGE`.
+        :type language: ``str``
+
+        :param country: Country id, can be one of `ALLOWED_COUNTRY`.
+        :type country: ``str``
+
+        :return: ``list`` of ``dict`` containing information about channel
+          sources.
+        """
+        assert category ==  ALL or category in ALLOWED_CATEGORY, \
+            "Category should be one of '{}'".format(ALLOWED_CATEGORY)
+        assert language == ALL or language in ALLOWED_LANGUAGE, \
+            "language should be one of '{}'".format(ALLOWED_LANGUAGE)
+        assert country == ALL or country in ALLOWED_COUNTRY, \
+            "Country should be one of '{}'".format(ALLOWED_COUNTRY)
+        sources = self._request(endpoint='sources', category=category,
+                                language=language, country=country)
+        sources = sources['sources']
+        return sources
+
+    def _get_sources_info(self, infotype, category=ALL, language=ALL,
+                          country=ALL):
+        """
+        Returns particular information about the sources (specified as
+        `infotype`).
+
+        :param infotype: Type of information to be fetched from sources, can be
+          one or more of `id`, `name`, `description`, `url`, `category`,
+          `language` or `country`.
+
+        :param category: category of news, can be one of `ALLOWED_CATEGORY`.
+        :type category: ``str``
+
+        :param language: language of news, can be one of `ALLOWED_LANGUAGE`.
+        :type language: ``str``
+
+        :param country: Country id, can be one of `ALLOWED_COUNTRY`.
+        :type country: ``str``
+        """
+        sources = self._get_sources(category=category, language=language,
+                                    country=country)
+        slist = list()
+        if isinstance(infotype, (list, tuple)):
+            # User asked to fetch more than 1 type of information
+            # In such a case, return list of `dict`.
+            for s in sources:
+                info = {}
+                for i in infotype:
+                    info[i] = s[i]
+                slist.append(info)
+        else:
+            for s in sources:
+                slist.append(s[infotype])
+        return slist
 
     def _url_join(self, prefix, *parts, query_string=""):
         """
@@ -101,8 +160,12 @@ class NewsReader:
 
         :return: ``json`` response from the request sent to the `endpoint`
         """
-        params     = list(kwargs.items())
-        params     = map(lambda x: "{}={}".format(x[0], x[1]), params)
+        params = []
+        default_values = (ALL, '', None)
+        for arg, value in kwargs.items():
+            if value in default_values:
+                continue
+            params.append('{}={}'.format(arg, value))
         get_params = "&".join(params)
         get_params = self._add_apikey_param(get_params)
         url = self._url_join(self.url, endpoint, query_string=get_params)
